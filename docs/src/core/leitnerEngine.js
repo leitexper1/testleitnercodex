@@ -230,30 +230,10 @@ function resolveEngineContext(options = {}) {
 function buildScheduledDeck(cards, context) {
     const schedulingContext = {
         ...context,
-        recomputeNextReview: false
+        recomputeNextReview: true
     };
 
-    const deck = (cards || []).map(card =>
+    return (cards || []).map(card =>
         LeitnerEngine.normaliseCard(card, schedulingContext)
     );
-
-    return deck.map(card => {
-        const schedulingCard = {
-            ...card,
-            nextReview: undefined
-        };
-
-        const nextReview = LeitnerEngine.computeCardNextReview(
-            schedulingCard,
-            context.curve,
-            context.difficulties,
-            context.now,
-            { ignoreStoredNextReview: true }
-        );
-
-        return {
-            ...schedulingCard,
-            nextReview
-        };
-    });
 }
