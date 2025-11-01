@@ -27,15 +27,28 @@ export class LeitnerEngine {
     }
 
     static computeCardNextReview(card, curve, difficulties, now = Date.now(), options = {}) {
-        const { ignoreStoredNextReview = false } = options || {};
+        const {
+            ignoreStoredNextReview = false,
+            curveOverride = false,
+            difficultiesOverride = false,
+            scheduleSignature: providedScheduleSignature = null
+        } = options || {};
         if (!card) {
             return now;
         }
 
         const effectiveCurve = curve || LeitnerEngine.DEFAULT_CURVE;
         const effectiveDifficulties = difficulties || LeitnerEngine.DEFAULT_DIFFICULTIES;
+        const effectiveSignature = providedScheduleSignature
+            || createScheduleSignature(effectiveCurve, effectiveDifficulties);
+        const storedSignature = card?.scheduleSignature ?? null;
+        const hasScheduleMismatch = storedSignature !== effectiveSignature;
+        const shouldIgnoreStored = ignoreStoredNextReview
+            || curveOverride
+            || difficultiesOverride
+            || hasScheduleMismatch;
 
-        if (!ignoreStoredNextReview && card.nextReview && Number.isFinite(Number(card.nextReview))) {
+        if (!shouldIgnoreStored && card.nextReview && Number.isFinite(Number(card.nextReview))) {
             return Number(card.nextReview);
         }
 
@@ -180,7 +193,10 @@ export class LeitnerEngine {
                 effectiveCurve,
                 effectiveDifficulties,
                 now,
-                { ignoreStoredNextReview: true }
+                {
+                    ignoreStoredNextReview: true,
+                    scheduleSignature: effectiveSignature
+                }
             );
 
         return {
@@ -291,7 +307,10 @@ function buildScheduledDeck(cards, context) {
             context.difficulties,
             context.now,
             {
-                ignoreStoredNextReview: shouldReschedule
+                ignoreStoredNextReview: shouldReschedule,
+                curveOverride: context.curveOverride,
+                difficultiesOverride: context.difficultiesOverride,
+                scheduleSignature: context.scheduleSignature
             }
         );
 
