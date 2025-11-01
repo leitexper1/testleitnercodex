@@ -79,7 +79,7 @@ export class LeitnerEngine {
 
     static summariseBoxes(cards, options = {}) {
         const context = resolveEngineContext(options);
-        const deck = LeitnerEngine.normaliseDeck(cards, { ...context, recomputeNextReview: true });
+        const deck = buildScheduledDeck(cards, context);
         const summaries = [];
 
         for (let index = 0; index < context.curve.length; index += 1) {
@@ -104,7 +104,7 @@ export class LeitnerEngine {
     static getCardsForBox(cards, boxNumber, options = {}) {
         const context = resolveEngineContext(options);
         const normalisedBox = Math.max(1, Math.min(context.curve.length, parseInt(boxNumber, 10) || 1));
-        const deck = LeitnerEngine.normaliseDeck(cards, { ...context, recomputeNextReview: true });
+        const deck = buildScheduledDeck(cards, context);
 
         return deck
             .filter(card => card.box === normalisedBox)
@@ -113,7 +113,7 @@ export class LeitnerEngine {
 
     static selectNextCard(cards, options = {}) {
         const context = resolveEngineContext(options);
-        const deck = LeitnerEngine.normaliseDeck(cards, { ...context, recomputeNextReview: true });
+        const deck = buildScheduledDeck(cards, context);
 
         if (deck.length === 0) {
             return null;
@@ -225,4 +225,35 @@ function resolveEngineContext(options = {}) {
         now: resolvedNow,
         recomputeNextReview: resolvedRecompute
     };
+}
+
+function buildScheduledDeck(cards, context) {
+    const schedulingContext = {
+        ...context,
+        recomputeNextReview: false
+    };
+
+    const deck = (cards || []).map(card =>
+        LeitnerEngine.normaliseCard(card, schedulingContext)
+    );
+
+    return deck.map(card => {
+        const schedulingCard = {
+            ...card,
+            nextReview: undefined
+        };
+
+        const nextReview = LeitnerEngine.computeCardNextReview(
+            schedulingCard,
+            context.curve,
+            context.difficulties,
+            context.now,
+            { ignoreStoredNextReview: true }
+        );
+
+        return {
+            ...schedulingCard,
+            nextReview
+        };
+    });
 }
