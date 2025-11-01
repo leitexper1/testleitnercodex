@@ -243,12 +243,35 @@ function resolveEngineContext(options = {}) {
 }
 
 function buildScheduledDeck(cards, context) {
-    const schedulingContext = {
+    const shouldReschedule = Boolean(
+        context.recomputeNextReview
+        || context.curveOverride
+        || context.difficultiesOverride
+    );
+
+    const normalisationContext = {
         ...context,
-        recomputeNextReview: true
+        recomputeNextReview: false,
+        curveOverride: false,
+        difficultiesOverride: false
     };
 
-    return (cards || []).map(card =>
-        LeitnerEngine.normaliseCard(card, schedulingContext)
-    );
+    return (cards || []).map(card => {
+        const normalised = LeitnerEngine.normaliseCard(card, normalisationContext);
+        const hasStoredNextReview = Number.isFinite(Number(normalised.nextReview));
+        const nextReview = shouldReschedule || !hasStoredNextReview
+            ? LeitnerEngine.computeCardNextReview(
+                normalised,
+                context.curve,
+                context.difficulties,
+                context.now,
+                { ignoreStoredNextReview: true }
+            )
+            : Number(normalised.nextReview);
+
+        return {
+            ...normalised,
+            nextReview
+        };
+    });
 }
