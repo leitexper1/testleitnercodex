@@ -258,16 +258,15 @@ function buildScheduledDeck(cards, context) {
 
     return (cards || []).map(card => {
         const normalised = LeitnerEngine.normaliseCard(card, normalisationContext);
-        const hasStoredNextReview = Number.isFinite(Number(normalised.nextReview));
-        const nextReview = hasStoredNextReview
-            ? Number(normalised.nextReview)
-            : LeitnerEngine.computeCardNextReview(
-                normalised,
-                context.curve,
-                context.difficulties,
-                context.now,
-                { ignoreStoredNextReview: true }
-            );
+        const nextReview = LeitnerEngine.computeCardNextReview(
+            normalised,
+            context.curve,
+            context.difficulties,
+            context.now,
+            {
+                ignoreStoredNextReview: shouldReschedule
+            }
+        );
 
         return {
             ...normalised,
