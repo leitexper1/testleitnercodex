@@ -127,7 +127,15 @@ export class LeitnerEngine {
         return ordered[0] || null;
     }
 
-    static normaliseCard(card, { curve, difficulties, defaultDifficulty = 'normal', now = Date.now(), recomputeNextReview = false } = {}) {
+    static normaliseCard(card, {
+        curve,
+        difficulties,
+        defaultDifficulty = 'normal',
+        now = Date.now(),
+        recomputeNextReview = false,
+        curveOverride = false,
+        difficultiesOverride = false
+    } = {}) {
         const effectiveCurve = curve || LeitnerEngine.DEFAULT_CURVE;
         const effectiveDifficulties = difficulties || LeitnerEngine.DEFAULT_DIFFICULTIES;
 
@@ -142,7 +150,8 @@ export class LeitnerEngine {
             difficulty
         };
 
-        const shouldReuseStored = !recomputeNextReview && card.nextReview && Number.isFinite(Number(card.nextReview));
+        const shouldForceReschedule = recomputeNextReview || curveOverride || difficultiesOverride;
+        const shouldReuseStored = !shouldForceReschedule && card.nextReview && Number.isFinite(Number(card.nextReview));
         const schedulingCard = shouldReuseStored ? baseCard : { ...baseCard, nextReview: undefined };
 
         const nextReview = shouldReuseStored
@@ -190,7 +199,9 @@ function resolveEngineContext(options = {}) {
             difficulties: { ...LeitnerEngine.DEFAULT_DIFFICULTIES },
             defaultDifficulty: 'normal',
             now: Date.now(),
-            recomputeNextReview: false
+            recomputeNextReview: false,
+            curveOverride: false,
+            difficultiesOverride: false
         };
     }
 
@@ -217,13 +228,17 @@ function resolveEngineContext(options = {}) {
 
     const resolvedNow = Number.isFinite(now) ? Number(now) : Date.now();
     const resolvedRecompute = Boolean(recomputeNextReview);
+    const hasCurveOverride = Object.prototype.hasOwnProperty.call(options, 'curve');
+    const hasDifficultiesOverride = Object.prototype.hasOwnProperty.call(options, 'difficulties');
 
     return {
         curve: resolvedCurve,
         difficulties: resolvedDifficulties,
         defaultDifficulty: resolvedDefaultDifficulty,
         now: resolvedNow,
-        recomputeNextReview: resolvedRecompute
+        recomputeNextReview: resolvedRecompute,
+        curveOverride: hasCurveOverride,
+        difficultiesOverride: hasDifficultiesOverride
     };
 }
 
