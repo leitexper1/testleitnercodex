@@ -24,7 +24,49 @@ function escapeCsvValue(value) {
     return stringValue;
 }
 
-function parseCsvLine(line) {
+function detectDelimiter(sampleLine) {
+    if (!sampleLine) {
+        return ',';
+    }
+
+    let commaCount = 0;
+    let semicolonCount = 0;
+    let inQuotes = false;
+
+    for (let i = 0; i < sampleLine.length; i += 1) {
+        const char = sampleLine[i];
+
+        if (char === '"') {
+            if (inQuotes && sampleLine[i + 1] === '"') {
+                i += 1;
+            } else {
+                inQuotes = !inQuotes;
+            }
+        } else if (!inQuotes) {
+            if (char === ',') {
+                commaCount += 1;
+            } else if (char === ';') {
+                semicolonCount += 1;
+            }
+        }
+    }
+
+    if (semicolonCount && !commaCount) {
+        return ';';
+    }
+
+    if (commaCount && !semicolonCount) {
+        return ',';
+    }
+
+    if (semicolonCount || commaCount) {
+        return semicolonCount >= commaCount ? ';' : ',';
+    }
+
+    return ',';
+}
+
+function parseCsvLine(line, delimiter = ',') {
     const values = [];
     let current = '';
     let inQuotes = false;
@@ -39,7 +81,7 @@ function parseCsvLine(line) {
             } else {
                 inQuotes = !inQuotes;
             }
-        } else if ((char === ',' || char === ';') && !inQuotes) {
+        } else if (char === delimiter && !inQuotes) {
             values.push(current);
             current = '';
         } else {
@@ -213,12 +255,13 @@ export class CSVInlineEditor {
             return;
         }
 
-        const headers = parseCsvLine(rows[0]);
+        const delimiter = detectDelimiter(rows[0]);
+        const headers = parseCsvLine(rows[0], delimiter);
         const hasHeaders = headers.length === CSV_FIELDS.length && CSV_FIELDS.every((field, index) => headers[index] === field.header);
         const dataRows = hasHeaders ? rows.slice(1) : rows;
 
         this.data = dataRows.map((row) => {
-            const values = parseCsvLine(row);
+            const values = parseCsvLine(row, delimiter);
             const mapped = {};
             CSV_FIELDS.forEach((field, index) => {
                 const rawValue = values[index] ?? '';
