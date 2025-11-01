@@ -49,6 +49,7 @@ export class LeitnerEngine {
     static evaluateAnswer(card, { isCorrect, difficulty, curve, difficulties, now = Date.now() }) {
         const effectiveCurve = curve || LeitnerEngine.DEFAULT_CURVE;
         const effectiveDifficulties = difficulties || LeitnerEngine.DEFAULT_DIFFICULTIES;
+        const scheduleSignature = createScheduleSignature(effectiveCurve, effectiveDifficulties);
 
         const currentBox = parseInt(card.box, 10) || 1;
         const nextBox = isCorrect
@@ -66,7 +67,8 @@ export class LeitnerEngine {
             box: nextBox,
             lastReview: now,
             difficulty: nextDifficulty || card.difficulty || 'normal',
-            nextReview: scheduledAt
+            nextReview: scheduledAt,
+            scheduleSignature
         };
     }
 
@@ -143,14 +145,19 @@ export class LeitnerEngine {
         now = Date.now(),
         recomputeNextReview = false,
         curveOverride = false,
-        difficultiesOverride = false
+        difficultiesOverride = false,
+        scheduleSignature = null
     } = {}) {
         const effectiveCurve = curve || LeitnerEngine.DEFAULT_CURVE;
         const effectiveDifficulties = difficulties || LeitnerEngine.DEFAULT_DIFFICULTIES;
+        const effectiveSignature = scheduleSignature || createScheduleSignature(effectiveCurve, effectiveDifficulties);
 
         const normalisedBox = Math.max(1, Math.min(effectiveCurve.length, parseInt(card.box, 10) || 1));
         const lastReview = LeitnerEngine.resolveLastReview(card, now);
         const difficulty = (card.difficulty || card.difficultyKey || defaultDifficulty || 'normal').toLowerCase();
+        const existingSignature = card?.scheduleSignature;
+        const hasScheduleMismatch = Boolean(effectiveSignature)
+            && existingSignature !== effectiveSignature;
 
         const baseCard = {
             ...card,
@@ -159,7 +166,10 @@ export class LeitnerEngine {
             difficulty
         };
 
-        const shouldForceReschedule = recomputeNextReview || curveOverride || difficultiesOverride;
+        const shouldForceReschedule = recomputeNextReview
+            || curveOverride
+            || difficultiesOverride
+            || hasScheduleMismatch;
         const shouldReuseStored = !shouldForceReschedule && card.nextReview && Number.isFinite(Number(card.nextReview));
         const schedulingCard = shouldReuseStored ? baseCard : { ...baseCard, nextReview: undefined };
 
@@ -175,7 +185,8 @@ export class LeitnerEngine {
 
         return {
             ...schedulingCard,
-            nextReview
+            nextReview,
+            scheduleSignature: effectiveSignature
         };
     }
 
@@ -203,14 +214,17 @@ export class LeitnerEngine {
 
 function resolveEngineContext(options = {}) {
     if (!options || typeof options !== 'object') {
+        const curve = [...LeitnerEngine.DEFAULT_CURVE];
+        const difficulties = { ...LeitnerEngine.DEFAULT_DIFFICULTIES };
         return {
-            curve: [...LeitnerEngine.DEFAULT_CURVE],
-            difficulties: { ...LeitnerEngine.DEFAULT_DIFFICULTIES },
+            curve,
+            difficulties,
             defaultDifficulty: 'normal',
             now: Date.now(),
             recomputeNextReview: false,
             curveOverride: false,
-            difficultiesOverride: false
+            difficultiesOverride: false,
+            scheduleSignature: createScheduleSignature(curve, difficulties)
         };
     }
 
@@ -239,6 +253,7 @@ function resolveEngineContext(options = {}) {
     const resolvedRecompute = Boolean(recomputeNextReview);
     const hasCurveOverride = Object.prototype.hasOwnProperty.call(options, 'curve');
     const hasDifficultiesOverride = Object.prototype.hasOwnProperty.call(options, 'difficulties');
+    const scheduleSignature = createScheduleSignature(resolvedCurve, resolvedDifficulties);
 
     return {
         curve: resolvedCurve,
@@ -247,25 +262,28 @@ function resolveEngineContext(options = {}) {
         now: resolvedNow,
         recomputeNextReview: resolvedRecompute,
         curveOverride: hasCurveOverride,
-        difficultiesOverride: hasDifficultiesOverride
+        difficultiesOverride: hasDifficultiesOverride,
+        scheduleSignature
     };
 }
 
 function buildScheduledDeck(cards, context) {
-    const shouldReschedule = Boolean(
+    const globalReschedule = Boolean(
         context.recomputeNextReview
         || context.curveOverride
         || context.difficultiesOverride
     );
 
-    const normalisationContext = {
-        ...context,
-        recomputeNextReview: shouldReschedule,
-        curveOverride: false,
-        difficultiesOverride: false
-    };
-
     return (cards || []).map(card => {
+        const scheduleMismatch = Boolean(context.scheduleSignature)
+            && card?.scheduleSignature !== context.scheduleSignature;
+        const shouldReschedule = globalReschedule || scheduleMismatch;
+        const normalisationContext = {
+            ...context,
+            recomputeNextReview: shouldReschedule,
+            curveOverride: shouldReschedule ? true : context.curveOverride,
+            difficultiesOverride: shouldReschedule ? true : context.difficultiesOverride
+        };
         const normalised = LeitnerEngine.normaliseCard(card, normalisationContext);
         const nextReview = LeitnerEngine.computeCardNextReview(
             normalised,
@@ -279,7 +297,24 @@ function buildScheduledDeck(cards, context) {
 
         return {
             ...normalised,
-            nextReview
+            nextReview,
+            scheduleSignature: context.scheduleSignature
         };
+    });
+}
+
+function createScheduleSignature(curve, difficulties) {
+    const normalisedCurve = Array.isArray(curve)
+        ? curve.map(value => (Number.isFinite(Number(value)) ? Number(value) : 1))
+        : [];
+    const normalisedDifficulties = difficulties && typeof difficulties === 'object'
+        ? Object.entries(difficulties)
+            .map(([key, value]) => [key, Number.isFinite(Number(value)) ? Number(value) : 1])
+            .sort(([a], [b]) => a.localeCompare(b))
+        : [];
+
+    return JSON.stringify({
+        curve: normalisedCurve,
+        difficulties: normalisedDifficulties
     });
 }
