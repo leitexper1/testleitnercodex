@@ -79,7 +79,10 @@ export class LeitnerEngine {
 
     static summariseBoxes(cards, options = {}) {
         const context = resolveEngineContext(options);
-        const deck = buildScheduledDeck(cards, context);
+        const deck = buildScheduledDeck(cards, {
+            ...context,
+            recomputeNextReview: true
+        });
         const summaries = [];
 
         for (let index = 0; index < context.curve.length; index += 1) {
@@ -104,7 +107,10 @@ export class LeitnerEngine {
     static getCardsForBox(cards, boxNumber, options = {}) {
         const context = resolveEngineContext(options);
         const normalisedBox = Math.max(1, Math.min(context.curve.length, parseInt(boxNumber, 10) || 1));
-        const deck = buildScheduledDeck(cards, context);
+        const deck = buildScheduledDeck(cards, {
+            ...context,
+            recomputeNextReview: true
+        });
 
         return deck
             .filter(card => card.box === normalisedBox)
@@ -113,7 +119,10 @@ export class LeitnerEngine {
 
     static selectNextCard(cards, options = {}) {
         const context = resolveEngineContext(options);
-        const deck = buildScheduledDeck(cards, context);
+        const deck = buildScheduledDeck(cards, {
+            ...context,
+            recomputeNextReview: true
+        });
 
         if (deck.length === 0) {
             return null;
