@@ -26,7 +26,8 @@ export class LeitnerEngine {
         return 1;
     }
 
-    static computeCardNextReview(card, curve, difficulties, now = Date.now()) {
+    static computeCardNextReview(card, curve, difficulties, now = Date.now(), options = {}) {
+        const { ignoreStoredNextReview = false } = options || {};
         if (!card) {
             return now;
         }
@@ -34,7 +35,7 @@ export class LeitnerEngine {
         const effectiveCurve = curve || LeitnerEngine.DEFAULT_CURVE;
         const effectiveDifficulties = difficulties || LeitnerEngine.DEFAULT_DIFFICULTIES;
 
-        if (card.nextReview && Number.isFinite(Number(card.nextReview))) {
+        if (!ignoreStoredNextReview && card.nextReview && Number.isFinite(Number(card.nextReview))) {
             return Number(card.nextReview);
         }
 
@@ -78,7 +79,7 @@ export class LeitnerEngine {
 
     static summariseBoxes(cards, options = {}) {
         const context = resolveEngineContext(options);
-        const deck = LeitnerEngine.normaliseDeck(cards, context);
+        const deck = LeitnerEngine.normaliseDeck(cards, { ...context, recomputeNextReview: true });
         const summaries = [];
 
         for (let index = 0; index < context.curve.length; index += 1) {
@@ -103,7 +104,7 @@ export class LeitnerEngine {
     static getCardsForBox(cards, boxNumber, options = {}) {
         const context = resolveEngineContext(options);
         const normalisedBox = Math.max(1, Math.min(context.curve.length, parseInt(boxNumber, 10) || 1));
-        const deck = LeitnerEngine.normaliseDeck(cards, context);
+        const deck = LeitnerEngine.normaliseDeck(cards, { ...context, recomputeNextReview: true });
 
         return deck
             .filter(card => card.box === normalisedBox)
@@ -112,7 +113,7 @@ export class LeitnerEngine {
 
     static selectNextCard(cards, options = {}) {
         const context = resolveEngineContext(options);
-        const deck = LeitnerEngine.normaliseDeck(cards, context);
+        const deck = LeitnerEngine.normaliseDeck(cards, { ...context, recomputeNextReview: true });
 
         if (deck.length === 0) {
             return null;
@@ -126,7 +127,7 @@ export class LeitnerEngine {
         return ordered[0] || null;
     }
 
-    static normaliseCard(card, { curve, difficulties, defaultDifficulty = 'normal', now = Date.now() } = {}) {
+    static normaliseCard(card, { curve, difficulties, defaultDifficulty = 'normal', now = Date.now(), recomputeNextReview = false } = {}) {
         const effectiveCurve = curve || LeitnerEngine.DEFAULT_CURVE;
         const effectiveDifficulties = difficulties || LeitnerEngine.DEFAULT_DIFFICULTIES;
 
@@ -141,12 +142,21 @@ export class LeitnerEngine {
             difficulty
         };
 
-        const nextReview = card.nextReview && Number.isFinite(Number(card.nextReview))
+        const shouldReuseStored = !recomputeNextReview && card.nextReview && Number.isFinite(Number(card.nextReview));
+        const schedulingCard = shouldReuseStored ? baseCard : { ...baseCard, nextReview: undefined };
+
+        const nextReview = shouldReuseStored
             ? Number(card.nextReview)
-            : LeitnerEngine.computeCardNextReview(baseCard, effectiveCurve, effectiveDifficulties, now);
+            : LeitnerEngine.computeCardNextReview(
+                schedulingCard,
+                effectiveCurve,
+                effectiveDifficulties,
+                now,
+                { ignoreStoredNextReview: true }
+            );
 
         return {
-            ...baseCard,
+            ...schedulingCard,
             nextReview
         };
     }
@@ -179,7 +189,8 @@ function resolveEngineContext(options = {}) {
             curve: [...LeitnerEngine.DEFAULT_CURVE],
             difficulties: { ...LeitnerEngine.DEFAULT_DIFFICULTIES },
             defaultDifficulty: 'normal',
-            now: Date.now()
+            now: Date.now(),
+            recomputeNextReview: false
         };
     }
 
@@ -187,7 +198,8 @@ function resolveEngineContext(options = {}) {
         curve = LeitnerEngine.DEFAULT_CURVE,
         difficulties = LeitnerEngine.DEFAULT_DIFFICULTIES,
         defaultDifficulty = 'normal',
-        now = Date.now()
+        now = Date.now(),
+        recomputeNextReview = false
     } = options;
 
     const resolvedCurve = Array.isArray(curve) && curve.length > 0
@@ -204,11 +216,13 @@ function resolveEngineContext(options = {}) {
         : 'normal';
 
     const resolvedNow = Number.isFinite(now) ? Number(now) : Date.now();
+    const resolvedRecompute = Boolean(recomputeNextReview);
 
     return {
         curve: resolvedCurve,
         difficulties: resolvedDifficulties,
         defaultDifficulty: resolvedDefaultDifficulty,
-        now: resolvedNow
+        now: resolvedNow,
+        recomputeNextReview: resolvedRecompute
     };
 }
