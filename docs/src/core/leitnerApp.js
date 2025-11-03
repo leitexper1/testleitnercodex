@@ -265,6 +265,27 @@ export class LeitnerApp {
 
     loadCSVFromCache() {
         this.bootstrapFromCache();
+        const csvNames = this.storage.getJSON('leitnerCSVList', []);
+
+        if (!Array.isArray(csvNames) || csvNames.length === 0) {
+            this.ui.populateCSVSelector([]);
+            return;
+        }
+
+        const offlineFiles = csvNames.map(name => ({ name }));
+        this.github.csvFiles = offlineFiles;
+
+        const preferredName = this.getPreferredCSVName(csvNames[0]);
+        const selectedName = csvNames.includes(preferredName) ? preferredName : csvNames[0];
+        this.ui.populateCSVSelector(offlineFiles, { selectedName });
+
+        if (this.crud.loadFlashcards(selectedName)) {
+            return;
+        }
+
+        this.setCurrentCSV(selectedName);
+        this.flashcards = [];
+        this.refreshBoxes();
     }
 
     async loadCSVFromURL(url, csvName) {
