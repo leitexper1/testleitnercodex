@@ -149,10 +149,12 @@ export class GitHubManager {
                 }
 
                 if (this.csvFiles.length > 0 || branch === '') {
-                    const effectiveBranch = this.resolveEffectiveBranch(branch, contents);
-                    if (effectiveBranch) {
-                        this.effectiveBranch = effectiveBranch;
-                        this.persistResolvedBranch(effectiveBranch);
+                    const resolvedBranch = this.resolveEffectiveBranch(branch, contents);
+                    const branchToPersist = resolvedBranch || branch || null;
+
+                    if (branchToPersist) {
+                        this.effectiveBranch = branchToPersist;
+                        this.persistResolvedBranch(branchToPersist);
                     }
                     return this.csvFiles;
                 }
