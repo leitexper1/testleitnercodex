@@ -42,6 +42,56 @@ export class GitHubManager {
         return Array.from(uniqueBranches);
     }
 
+    resolveEffectiveBranch(requestedBranch, contents) {
+        if (requestedBranch) {
+            return requestedBranch;
+        }
+
+        if (!Array.isArray(contents)) {
+            return null;
+        }
+
+        const fileWithDownloadUrl = contents.find(item => typeof item?.download_url === 'string');
+        if (!fileWithDownloadUrl) {
+            return null;
+        }
+
+        try {
+            const downloadUrl = new URL(fileWithDownloadUrl.download_url);
+            const segments = downloadUrl.pathname.split('/').filter(Boolean);
+            if (segments.length >= 3) {
+                return decodeURIComponent(segments[2]);
+            }
+        } catch (error) {
+            console.warn('Impossible de déterminer la branche GitHub effective:', error);
+        }
+
+        return null;
+    }
+
+    persistResolvedBranch(branch) {
+        if (!branch || branch === this.config.repoBranch) {
+            return;
+        }
+
+        this.setConfig({ repoBranch: branch });
+
+        if (typeof window === 'undefined' || !window.localStorage) {
+            return;
+        }
+
+        try {
+            const storedConfig = window.localStorage.getItem('leitnerConfig');
+            const parsedConfig = storedConfig ? JSON.parse(storedConfig) : {};
+            window.localStorage.setItem('leitnerConfig', JSON.stringify({
+                ...parsedConfig,
+                repoBranch: branch
+            }));
+        } catch (error) {
+            console.warn('Impossible de persister la branche GitHub détectée:', error);
+        }
+    }
+
     async apiRequest(endpoint, options = {}) {
         const { branch = null, headers: customHeaders = {}, ...fetchOptions } = options;
         let url = `https://api.github.com/repos/${this.config.repoOwner}/${this.config.repoName}${endpoint}`;
@@ -95,6 +145,10 @@ export class GitHubManager {
                 }
 
                 if (this.csvFiles.length > 0 || branch === '') {
+                    const effectiveBranch = this.resolveEffectiveBranch(branch, contents);
+                    if (effectiveBranch) {
+                        this.persistResolvedBranch(effectiveBranch);
+                    }
                     return this.csvFiles;
                 }
             } catch (error) {
