@@ -329,21 +329,34 @@ export class UIManager {
         });
     }
     
-    populateCSVSelector(csvFiles) {
+    populateCSVSelector(csvFiles, { selectedName = null } = {}) {
         const selector = document.getElementById('csv-selector');
-        
+
         // Garder l'option par défaut
         selector.innerHTML = '<option value="default">Sélectionner un fichier CSV</option>';
-        
+
         // Ajouter les fichiers CSV du dépôt GitHub
-        csvFiles.forEach(file => {
+        csvFiles.forEach((file, index) => {
             const option = document.createElement('option');
             option.value = file.name;
             option.textContent = file.name;
-            option.dataset.downloadUrl = file.download_url;
-            option.selected = true; // Sélectionner le premier fichier par défaut
+            if (file.download_url) {
+                option.dataset.downloadUrl = file.download_url;
+            }
+
+            if (selectedName) {
+                option.selected = file.name === selectedName;
+            } else if (index === 0) {
+                option.selected = true;
+            }
             selector.appendChild(option);
         });
+
+        if (selectedName) {
+            selector.value = selectedName;
+        } else if (csvFiles.length > 0) {
+            selector.value = csvFiles[0].name;
+        }
     }
     
     showCardsList(boxNumber, cards = []) {
@@ -616,7 +629,7 @@ export class UIManager {
                     alert(`Fichier "${selectedCSV}" chargé avec ${this.app.flashcards.length} cartes`);
                 } else {
                     alert(`Création d'un nouveau fichier "${selectedCSV}"`);
-                    this.app.currentCSV = selectedCSV;
+                    this.app.setCurrentCSV(selectedCSV);
                     this.app.flashcards = [];
                     this.app.saveFlashcards();
                 }
@@ -652,7 +665,7 @@ export class UIManager {
                 document.getElementById('new-csv-name').value = '';
                 
                 // Charger le nouveau CSV
-                this.app.currentCSV = csvName;
+                this.app.setCurrentCSV(csvName);
                 this.app.flashcards = [];
                 this.app.saveFlashcards();
                 

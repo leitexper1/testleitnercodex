@@ -102,7 +102,7 @@ export class CRUDManager {
         const saved = this.storage.getJSON(`leitnerFlashcards_${csvName}`, null);
         if (Array.isArray(saved)) {
             this.app.flashcards = saved.map(card => this.app.normaliseCard(card));
-            this.app.currentCSV = csvName;
+            this.app.setCurrentCSV(csvName);
             this.app.updateBoxes();
             return true;
         }

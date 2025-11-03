@@ -6,6 +6,7 @@ import { HistoryService } from './historyService.js';
 import { StorageService } from '../data/storageService.js';
 
 const USER_CONFIG_KEY = 'leitnerUserConfig';
+const LAST_CSV_KEY = 'leitnerLastCSV';
 const DEFAULT_USER_CONFIG = {
     curves: {
         standard: [...LeitnerEngine.DEFAULT_CURVE]
@@ -61,6 +62,7 @@ export class LeitnerApp {
         this.crud.init(this);
         this.ui.applyUserConfig(this.userConfig);
 
+        this.bootstrapFromCache();
         await this.loadCSVFromGitHub();
         this.refreshBoxes();
         this.bindEvents();
@@ -193,21 +195,76 @@ export class LeitnerApp {
         this.currentDifficulty = value;
     }
 
+    setCurrentCSV(csvName = 'default') {
+        this.currentCSV = csvName || 'default';
+
+        if (this.currentCSV === 'default') {
+            this.storage.removeItem(LAST_CSV_KEY);
+        } else {
+            this.storage.setItem(LAST_CSV_KEY, this.currentCSV);
+        }
+    }
+
+    getPreferredCSVName(defaultName = null) {
+        const stored = this.storage.getItem(LAST_CSV_KEY);
+        if (stored && typeof stored === 'string') {
+            return stored;
+        }
+        return defaultName;
+    }
+
+    bootstrapFromCache() {
+        const csvNames = this.storage.getJSON('leitnerCSVList', []);
+
+        if (!Array.isArray(csvNames) || csvNames.length === 0) {
+            this.ui.populateCSVSelector([]);
+            return;
+        }
+
+        const offlineFiles = csvNames.map(name => ({ name }));
+        this.github.csvFiles = offlineFiles;
+
+        const preferredName = this.getPreferredCSVName(csvNames[0]);
+        const selectedName = csvNames.includes(preferredName) ? preferredName : csvNames[0];
+        this.ui.populateCSVSelector(offlineFiles, { selectedName });
+
+        if (this.crud.loadFlashcards(selectedName)) {
+            return;
+        }
+
+        this.setCurrentCSV(selectedName);
+        this.flashcards = [];
+        this.refreshBoxes();
+    }
+
     async loadCSVFromGitHub() {
         try {
             await this.github.loadCSVList();
-            this.ui.populateCSVSelector(this.github.csvFiles);
-
-            const csvNames = this.github.csvFiles.map(file => file.name);
+            const csvFiles = this.github.csvFiles;
+            const csvNames = csvFiles.map(file => file.name);
             this.storage.setJSON('leitnerCSVList', csvNames);
 
-            if (this.github.csvFiles.length > 0) {
-                const firstCSV = this.github.csvFiles[0];
-                await this.loadCSVFromURL(firstCSV.download_url, firstCSV.name);
+            if (csvFiles.length === 0) {
+                this.ui.populateCSVSelector([]);
+                return;
+            }
+
+            const preferredName = this.getPreferredCSVName(csvFiles[0].name);
+            const preferredFile = csvFiles.find(file => file.name === preferredName) || csvFiles[0];
+
+            this.ui.populateCSVSelector(csvFiles, { selectedName: preferredFile.name });
+
+            if (preferredFile.download_url) {
+                await this.loadCSVFromURL(preferredFile.download_url, preferredFile.name);
             }
         } catch (error) {
             console.error('Erreur de chargement depuis GitHub:', error);
+            this.loadCSVFromCache();
         }
+    }
+
+    loadCSVFromCache() {
+        this.bootstrapFromCache();
     }
 
     async loadCSVFromURL(url, csvName) {
@@ -240,7 +297,7 @@ export class LeitnerApp {
                 lastReview: card.lastReview || Date.now(),
                 difficulty: card.difficulty || this.userConfig.defaultDifficulty
             }));
-            this.currentCSV = csvName;
+            this.setCurrentCSV(csvName);
             this.saveFlashcards();
 
             alert(`${importedCards.length} cartes chargées depuis ${csvName}`);
@@ -378,7 +435,7 @@ export class LeitnerApp {
         if (confirm('Êtes-vous sûr de vouloir réinitialiser toutes les données? Cette action est irréversible.')) {
             this.storage.clear();
             this.flashcards = [];
-            this.currentCSV = 'default';
+            this.setCurrentCSV('default');
             this.userConfig = this.loadUserConfig();
             this.reviewIntervals = [...this.getActiveCurve()];
             this.ui.applyUserConfig(this.userConfig);
