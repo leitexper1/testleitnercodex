@@ -131,7 +131,7 @@ export class UIManager {
             showPreview(dataUrl);
             textInput.value = '';
             setStatus(`${label} Fournissez un fichier ou un lien pour l'export.`);
-            setAppImageState({ file: null, data: null });
+            setAppImageState({ file: null, data: dataUrl });
         };
 
         const useExternalPath = (value) => {
