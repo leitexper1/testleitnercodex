@@ -68,10 +68,73 @@ export class CRUDManager {
             ? Math.max(1, Math.trunc(Number(cardData.box)))
             : 1;
 
-        let resolvedLastReview = Date.parse(cardData.lastReview);
-        if (!Number.isFinite(resolvedLastReview)) {
-            resolvedLastReview = Date.now();
-        }
+        const existingIndex = cardData.id
+            ? this.app.flashcards.findIndex(c => c.id == cardData.id)
+            : -1;
+        const existingCard = existingIndex !== -1 ? this.app.flashcards[existingIndex] : null;
+
+        const formatDateForInput = (value) => {
+            if (!value) {
+                return '';
+            }
+
+            const source = value instanceof Date ? new Date(value.getTime()) : new Date(value);
+            if (Number.isNaN(source.getTime())) {
+                return '';
+            }
+
+            const year = source.getFullYear();
+            const month = String(source.getMonth() + 1).padStart(2, '0');
+            const day = String(source.getDate()).padStart(2, '0');
+            return `${year}-${month}-${day}`;
+        };
+
+        const mergeWithExistingTime = (timestamp) => {
+            if (!existingCard || !existingCard.lastReview) {
+                return timestamp;
+            }
+
+            const reference = new Date(existingCard.lastReview);
+            if (Number.isNaN(reference.getTime())) {
+                return timestamp;
+            }
+
+            const merged = new Date(timestamp);
+            merged.setHours(
+                reference.getHours(),
+                reference.getMinutes(),
+                reference.getSeconds(),
+                reference.getMilliseconds()
+            );
+            return merged.getTime();
+        };
+
+        const resolvedLastReview = (() => {
+            const rawLastReview = typeof cardData.lastReview === 'string'
+                ? cardData.lastReview.trim()
+                : '';
+            const hasInputValue = rawLastReview !== '';
+            const parsed = hasInputValue ? Date.parse(rawLastReview) : NaN;
+
+            if (existingCard) {
+                const existingInputValue = formatDateForInput(existingCard.lastReview);
+                if (hasInputValue && rawLastReview === existingInputValue) {
+                    return existingCard.lastReview;
+                }
+
+                if (Number.isFinite(parsed)) {
+                    return mergeWithExistingTime(parsed);
+                }
+
+                if (existingCard.lastReview) {
+                    return existingCard.lastReview;
+                }
+            } else if (Number.isFinite(parsed)) {
+                return parsed;
+            }
+
+            return Date.now();
+        })();
 
         const pendingImages = [
             processImageUpload({
@@ -97,20 +160,17 @@ export class CRUDManager {
             this.app.currentQuestionImageData = null;
             this.app.currentAnswerImageData = null;
 
-            if (cardData.id) {
-                const index = this.app.flashcards.findIndex(c => c.id == cardData.id);
-                if (index !== -1) {
-                    const existing = this.app.flashcards[index];
-                    this.app.flashcards[index] = this.app.normaliseCard({
-                        ...existing,
-                        question: cardData.question,
-                        questionImage: cardData.questionImage,
-                        answer: cardData.answer,
-                        answerImage: cardData.answerImage,
-                        box: resolvedBox,
-                        lastReview: resolvedLastReview
-                    });
-                }
+            if (cardData.id && existingIndex !== -1) {
+                const existing = this.app.flashcards[existingIndex];
+                this.app.flashcards[existingIndex] = this.app.normaliseCard({
+                    ...existing,
+                    question: cardData.question,
+                    questionImage: cardData.questionImage,
+                    answer: cardData.answer,
+                    answerImage: cardData.answerImage,
+                    box: resolvedBox,
+                    lastReview: resolvedLastReview
+                });
             } else {
                 const newId = Date.now();
                 const newCard = this.app.normaliseCard({
