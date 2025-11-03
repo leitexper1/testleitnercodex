@@ -39,6 +39,19 @@ export class CRUDManager {
             return `${directory}/${trimmed}`;
         };
 
+        const resolveInlineData = (...candidates) => {
+            for (const candidate of candidates) {
+                if (typeof candidate !== 'string') {
+                    continue;
+                }
+                const trimmed = candidate.trim();
+                if (trimmed.startsWith('data:')) {
+                    return trimmed;
+                }
+            }
+            return '';
+        };
+
         const processImageUpload = async ({ file, inlineData, fallback, type }) => {
             const repositoryPath = normaliseImagePath(fallback, type);
             if (repositoryPath) {
@@ -64,16 +77,25 @@ export class CRUDManager {
             return '';
         };
 
+        const questionInlineData = resolveInlineData(
+            this.app.currentQuestionImageData,
+            cardData.questionImageInline
+        );
+        const answerInlineData = resolveInlineData(
+            this.app.currentAnswerImageData,
+            cardData.answerImageInline
+        );
+
         const pendingImages = [
             processImageUpload({
                 file: this.app.currentQuestionImageFile,
-                inlineData: this.app.currentQuestionImageData,
+                inlineData: questionInlineData,
                 fallback: cardData.questionImage,
                 type: 'question'
             }),
             processImageUpload({
                 file: this.app.currentAnswerImageFile,
-                inlineData: this.app.currentAnswerImageData,
+                inlineData: answerInlineData,
                 fallback: cardData.answerImage,
                 type: 'answer'
             })

@@ -40,6 +40,10 @@ export class UIManager {
             };
         }
 
+        if (!textInput.dataset.inlineImage) {
+            textInput.dataset.inlineImage = '';
+        }
+
         const resolveImageType = () => (type === 'answer' ? 'answer' : 'question');
 
         const normaliseToRepositoryPath = (rawValue) => {
@@ -73,13 +77,27 @@ export class UIManager {
             return `${directory}/${safeName}`;
         };
 
+        const normaliseInlineData = (value) => {
+            if (typeof value !== 'string') {
+                return '';
+            }
+            return value.trim();
+        };
+
         const setAppImageState = ({ file = null, data = null } = {}) => {
+            const inlineData = normaliseInlineData(data);
+            const effectiveData = inlineData || null;
+
             if (type === 'question') {
                 this.app.currentQuestionImageFile = file;
-                this.app.currentQuestionImageData = data;
+                this.app.currentQuestionImageData = effectiveData;
             } else {
                 this.app.currentAnswerImageFile = file;
-                this.app.currentAnswerImageData = data;
+                this.app.currentAnswerImageData = effectiveData;
+            }
+
+            if (textInput) {
+                textInput.dataset.inlineImage = inlineData;
             }
         };
 
@@ -245,8 +263,8 @@ export class UIManager {
             }
         });
 
-        textInput.addEventListener('input', () => {
-            if (textInput.value.trim()) {
+        textInput.addEventListener('input', (event) => {
+            if (event?.isTrusted) {
                 setAppImageState({ file: null, data: null });
             }
         });
@@ -692,12 +710,16 @@ export class UIManager {
         // Soumission du formulaire
         document.getElementById('card-form').addEventListener('submit', (e) => {
             e.preventDefault();
+            const questionImageField = document.getElementById('card-question-image');
+            const answerImageField = document.getElementById('card-answer-image');
             this.app.crud.saveCard({
                 id: document.getElementById('card-id').value,
                 question: document.getElementById('card-question').value,
-                questionImage: document.getElementById('card-question-image').value,
+                questionImage: questionImageField?.value || '',
+                questionImageInline: questionImageField?.dataset?.inlineImage || '',
                 answer: document.getElementById('card-answer').value,
-                answerImage: document.getElementById('card-answer-image').value
+                answerImage: answerImageField?.value || '',
+                answerImageInline: answerImageField?.dataset?.inlineImage || ''
             });
         });
         
