@@ -7,11 +7,15 @@ export class GitHubManager {
             repoBranch: 'main',
             githubToken: ''
         };
+        this.effectiveBranch = this.config.repoBranch;
         this.csvFiles = [];
     }
 
     setConfig(config) {
         this.config = { ...this.config, ...config };
+        if (typeof config?.repoBranch === 'string' && config.repoBranch) {
+            this.effectiveBranch = config.repoBranch;
+        }
     }
 
     normaliseRepoPath(path) {
@@ -147,6 +151,7 @@ export class GitHubManager {
                 if (this.csvFiles.length > 0 || branch === '') {
                     const effectiveBranch = this.resolveEffectiveBranch(branch, contents);
                     if (effectiveBranch) {
+                        this.effectiveBranch = effectiveBranch;
                         this.persistResolvedBranch(effectiveBranch);
                     }
                     return this.csvFiles;
@@ -250,7 +255,7 @@ export class GitHubManager {
         if (imagePath.startsWith('data:')) return imagePath;
         
         // Construire l'URL GitHub pour l'image
-        const branch = this.config.repoBranch || 'main';
+        const branch = this.effectiveBranch || this.config.repoBranch || 'main';
         const baseUrl = `https://raw.githubusercontent.com/${this.config.repoOwner}/${this.config.repoName}/${branch}/`;
         
         // Utiliser le chemin du dépôt comme base
