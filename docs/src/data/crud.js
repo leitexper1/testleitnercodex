@@ -68,10 +68,9 @@ export class CRUDManager {
             ? Math.max(1, Math.trunc(Number(cardData.box)))
             : 1;
 
-        const existingIndex = cardData.id
-            ? this.app.flashcards.findIndex(c => c.id == cardData.id)
-            : -1;
-        const existingCard = existingIndex !== -1 ? this.app.flashcards[existingIndex] : null;
+        const existingCard = cardData.id
+            ? this.app.flashcards.find(c => c.id == cardData.id)
+            : null;
 
         const formatDateForInput = (value) => {
             if (!value) {
@@ -160,17 +159,33 @@ export class CRUDManager {
             this.app.currentQuestionImageData = null;
             this.app.currentAnswerImageData = null;
 
-            if (cardData.id && existingIndex !== -1) {
-                const existing = this.app.flashcards[existingIndex];
-                this.app.flashcards[existingIndex] = this.app.normaliseCard({
-                    ...existing,
-                    question: cardData.question,
-                    questionImage: cardData.questionImage,
-                    answer: cardData.answer,
-                    answerImage: cardData.answerImage,
-                    box: resolvedBox,
-                    lastReview: resolvedLastReview
-                });
+            if (cardData.id) {
+                const targetIndex = this.app.flashcards.findIndex(c => c.id == cardData.id);
+                if (targetIndex !== -1) {
+                    const existing = this.app.flashcards[targetIndex];
+                    this.app.flashcards[targetIndex] = this.app.normaliseCard({
+                        ...existing,
+                        question: cardData.question,
+                        questionImage: cardData.questionImage,
+                        answer: cardData.answer,
+                        answerImage: cardData.answerImage,
+                        box: resolvedBox,
+                        lastReview: resolvedLastReview
+                    });
+                } else {
+                    const newId = Date.now();
+                    const newCard = this.app.normaliseCard({
+                        id: newId,
+                        question: cardData.question,
+                        questionImage: cardData.questionImage,
+                        answer: cardData.answer,
+                        answerImage: cardData.answerImage,
+                        box: resolvedBox,
+                        lastReview: resolvedLastReview,
+                        difficulty: this.app.userConfig.defaultDifficulty
+                    });
+                    this.app.flashcards.push(newCard);
+                }
             } else {
                 const newId = Date.now();
                 const newCard = this.app.normaliseCard({
