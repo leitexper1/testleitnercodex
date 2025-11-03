@@ -89,6 +89,76 @@
             font-weight: 600;
         }
 
+        .sidebar {
+            display: flex;
+            flex-direction: column;
+            gap: clamp(1rem, 2vw, 1.4rem);
+        }
+
+        .sidebar__panel {
+            background: rgba(255, 255, 255, 0.92);
+            border-radius: 20px;
+            border: 1px solid rgba(37, 99, 235, 0.12);
+            box-shadow: var(--shadow);
+            overflow: hidden;
+        }
+
+        .sidebar__panel summary {
+            list-style: none;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 1rem 1.25rem;
+            font-size: 1.05rem;
+            font-weight: 600;
+            color: var(--text);
+        }
+
+        .sidebar__panel summary::-webkit-details-marker {
+            display: none;
+        }
+
+        .sidebar__panel summary .icon {
+            width: 36px;
+            height: 36px;
+            border-radius: 12px;
+            background: rgba(37, 99, 235, 0.12);
+            display: grid;
+            place-items: center;
+            color: var(--primary);
+            font-weight: 600;
+            flex-shrink: 0;
+        }
+
+        .sidebar__panel summary::after {
+            content: '▾';
+            margin-left: auto;
+            color: var(--primary);
+            transition: transform 0.2s ease;
+        }
+
+        .sidebar__panel[open] > summary::after {
+            transform: rotate(180deg);
+        }
+
+        .sidebar__panel summary:focus-visible {
+            outline: 3px solid rgba(37, 99, 235, 0.4);
+            outline-offset: 2px;
+        }
+
+        .sidebar__panel[open] > summary {
+            border-bottom: 1px solid rgba(37, 99, 235, 0.12);
+            margin-bottom: 0.4rem;
+        }
+
+        .sidebar__content {
+            padding: 0 1.25rem 1.25rem;
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
         .instructions-list {
             list-style: none;
             padding: 0;
@@ -427,12 +497,17 @@
             }
 
             .panel,
+            .sidebar__panel,
             table {
                 background: rgba(17, 24, 39, 0.88);
             }
 
             .image-card {
                 background: rgba(15, 23, 42, 0.88);
+            }
+
+            .sidebar__panel {
+                border-color: rgba(96, 165, 250, 0.2);
             }
 
             .image-selector__preview {
@@ -451,75 +526,83 @@
         </p>
     </header>
     <main>
-        <aside class="panel" aria-labelledby="instructions-title">
-            <h2 id="instructions-title"><span class="icon">①</span> Instructions essentielles</h2>
-            <ul class="instructions-list">
-                <li>
-                    <strong>Organisation locale</strong>
-                    Placez vos images de <span class="tooltip" title="Utilisées pour illustrer les questions">questions</span>
-                    dans <code>images_questions/</code> et vos images de
-                    <span class="tooltip" title="Illustrations accompagnant les réponses">réponses</span> dans <code>images_reponses/</code>.
-                </li>
-                <li>
-                    <strong>Structure recommandée</strong>
-                    Exemple : <code>images_questions/mon-theme_question-01.jpg</code> et
-                    <code>images_reponses/mon-theme_reponse-01.jpg</code> afin de garder des couples facilement identifiables.
-                </li>
-                <li>
-                    <strong>Chargement</strong>
-                    Importez vos images locales pour obtenir un aperçu et les proposer dans les listes déroulantes.
-                </li>
-                <li>
-                    <strong>Export</strong>
-                    Vérifiez votre configuration GitHub. L’export génère des liens complets
-                    <code>https://raw.githubusercontent.com/&lt;utilisateur&gt;/&lt;repo&gt;/&lt;branche&gt;/images_questions/&lt;fichier&gt;</code>.
-                </li>
-                <li>
-                    <strong>Aide</strong>
-                    Survolez les termes soulignés pour obtenir une explication. Des messages d’erreur s’affichent si une image
-                    référencée est introuvable.
-                </li>
-            </ul>
-            <section class="panel" aria-labelledby="config-title">
-                <h2 id="config-title"><span class="icon">②</span> Configuration GitHub</h2>
-                <form class="config-form" id="configForm">
-                    <div class="config-field">
-                        <label for="githubUser">Nom d’utilisateur GitHub</label>
-                        <input id="githubUser" name="githubUser" data-config="username" placeholder="ex. octocat" required>
-                    </div>
-                    <div class="config-field">
-                        <label for="githubRepo">Nom du repository</label>
-                        <input id="githubRepo" name="githubRepo" data-config="repository" placeholder="ex. leitner-cards" required>
-                    </div>
-                    <div class="config-field">
-                        <label for="githubBranch">Branche (par défaut : main)</label>
-                        <input id="githubBranch" name="githubBranch" data-config="branch" value="main" required>
-                    </div>
-                </form>
-                <div class="config-preview" id="linkPreview">https://raw.githubusercontent.com/USERNAME/REPO/BRANCH/images_questions/fichier.png</div>
-                <p class="helper-text">La configuration est enregistrée automatiquement dans votre navigateur (localStorage).</p>
-            </section>
-            <section class="panel" aria-labelledby="library-title">
-                <h2 id="library-title"><span class="icon">③</span> Bibliothèque d’images</h2>
-                <div class="image-library">
-                    <div>
-                        <label class="image-dropzone" tabindex="0" for="questionLibrary">
-                            <strong>Ajouter des images de questions</strong><br>
-                            Cliquez ou déposez vos fichiers du dossier <code>images_questions/</code>
-                        </label>
-                        <input id="questionLibrary" class="import-input" type="file" accept="image/*" multiple>
-                        <div class="image-list" id="questionGallery" aria-live="polite"></div>
-                    </div>
-                    <div>
-                        <label class="image-dropzone" tabindex="0" for="answerLibrary">
-                            <strong>Ajouter des images de réponses</strong><br>
-                            Cliquez ou déposez vos fichiers du dossier <code>images_reponses/</code>
-                        </label>
-                        <input id="answerLibrary" class="import-input" type="file" accept="image/*" multiple>
-                        <div class="image-list" id="answerGallery" aria-live="polite"></div>
+        <aside class="sidebar" aria-label="Guides et conseils">
+            <details class="sidebar__panel" open>
+                <summary><span class="icon">①</span><span>Instructions essentielles</span></summary>
+                <div class="sidebar__content">
+                    <ul class="instructions-list">
+                        <li>
+                            <strong>Organisation locale</strong>
+                            Placez vos images de <span class="tooltip" title="Utilisées pour illustrer les questions">questions</span>
+                            dans <code>images_questions/</code> et vos images de
+                            <span class="tooltip" title="Illustrations accompagnant les réponses">réponses</span> dans <code>images_reponses/</code>.
+                        </li>
+                        <li>
+                            <strong>Structure recommandée</strong>
+                            Exemple : <code>images_questions/mon-theme_question-01.jpg</code> et
+                            <code>images_reponses/mon-theme_reponse-01.jpg</code> afin de garder des couples facilement identifiables.
+                        </li>
+                        <li>
+                            <strong>Chargement</strong>
+                            Importez vos images locales pour obtenir un aperçu et les proposer dans les listes déroulantes.
+                        </li>
+                        <li>
+                            <strong>Export</strong>
+                            Vérifiez votre configuration GitHub. L’export génère des liens complets
+                            <code>https://raw.githubusercontent.com/&lt;utilisateur&gt;/&lt;repo&gt;/&lt;branche&gt;/images_questions/&lt;fichier&gt;</code>.
+                        </li>
+                        <li>
+                            <strong>Aide</strong>
+                            Survolez les termes soulignés pour obtenir une explication. Des messages d’erreur s’affichent si une image
+                            référencée est introuvable.
+                        </li>
+                    </ul>
+                </div>
+            </details>
+            <details class="sidebar__panel" open>
+                <summary><span class="icon">②</span><span>Configuration GitHub</span></summary>
+                <div class="sidebar__content">
+                    <form class="config-form" id="configForm">
+                        <div class="config-field">
+                            <label for="githubUser">Nom d’utilisateur GitHub</label>
+                            <input id="githubUser" name="githubUser" data-config="username" placeholder="ex. octocat" required>
+                        </div>
+                        <div class="config-field">
+                            <label for="githubRepo">Nom du repository</label>
+                            <input id="githubRepo" name="githubRepo" data-config="repository" placeholder="ex. leitner-cards" required>
+                        </div>
+                        <div class="config-field">
+                            <label for="githubBranch">Branche (par défaut : main)</label>
+                            <input id="githubBranch" name="githubBranch" data-config="branch" value="main" required>
+                        </div>
+                    </form>
+                    <div class="config-preview" id="linkPreview">https://raw.githubusercontent.com/USERNAME/REPO/BRANCH/images_questions/fichier.png</div>
+                    <p class="helper-text">La configuration est enregistrée automatiquement dans votre navigateur (localStorage).</p>
+                </div>
+            </details>
+            <details class="sidebar__panel">
+                <summary><span class="icon">③</span><span>Bibliothèque d’images</span></summary>
+                <div class="sidebar__content">
+                    <div class="image-library">
+                        <div>
+                            <label class="image-dropzone" tabindex="0" for="questionLibrary">
+                                <strong>Ajouter des images de questions</strong><br>
+                                Cliquez ou déposez vos fichiers du dossier <code>images_questions/</code>
+                            </label>
+                            <input id="questionLibrary" class="import-input" type="file" accept="image/*" multiple>
+                            <div class="image-list" id="questionGallery" aria-live="polite"></div>
+                        </div>
+                        <div>
+                            <label class="image-dropzone" tabindex="0" for="answerLibrary">
+                                <strong>Ajouter des images de réponses</strong><br>
+                                Cliquez ou déposez vos fichiers du dossier <code>images_reponses/</code>
+                            </label>
+                            <input id="answerLibrary" class="import-input" type="file" accept="image/*" multiple>
+                            <div class="image-list" id="answerGallery" aria-live="polite"></div>
+                        </div>
                     </div>
                 </div>
-            </section>
+            </details>
         </aside>
         <section class="panel editor-panel" aria-labelledby="editor-title">
             <div>
@@ -528,6 +611,7 @@
                     Un aperçu miniature est généré automatiquement.</p>
             </div>
             <div class="editor-actions">
+                <button type="button" id="loadCurrentCards" class="secondary" title="Charger les cartes sauvegardées dans l'application">✏️ Modifier les cartes actuelles</button>
                 <button type="button" id="addRow" title="Ajouter une nouvelle carte">➕ Ajouter une carte</button>
                 <button type="button" id="triggerImportCsv" class="secondary" title="Importer un fichier CSV existant">📥 Importer un CSV</button>
                 <input id="importCsv" class="import-input" type="file" accept="text/csv">
@@ -567,6 +651,8 @@
 
         const STORAGE_KEY = 'leitner-editor-config';
         const HEADER = ['question_content', 'question_content_image', 'answer_content', 'answer_content_image', 'box_number', 'last_reviewed'];
+        const LAST_CSV_KEY = 'leitnerLastCSV';
+        const FLASHCARD_PREFIX = 'leitnerFlashcards_';
 
         const configForm = document.getElementById('configForm');
         const linkPreview = document.getElementById('linkPreview');
@@ -576,6 +662,7 @@
         const answerDatalist = document.getElementById('answerImagesList');
         const statusMessage = document.getElementById('statusMessage');
         const cardsBody = document.getElementById('cardsBody');
+        const loadCurrentCardsButton = document.getElementById('loadCurrentCards');
 
         function formatDateInputValue(value) {
             if (!value) {
@@ -788,6 +875,23 @@
                 const option = document.createElement('option');
                 option.value = name;
                 datalist.append(option);
+            });
+        }
+
+        function ensureDatalistOptions(type, names) {
+            if (!names.size) {
+                return;
+            }
+            const datalist = type === 'question' ? questionDatalist : answerDatalist;
+            const existing = new Set(Array.from(datalist.children).map((option) => option.value));
+            names.forEach((name) => {
+                if (name && !existing.has(name)) {
+                    const option = document.createElement('option');
+                    option.value = name;
+                    option.dataset.source = 'loaded';
+                    datalist.append(option);
+                    existing.add(name);
+                }
             });
         }
 
@@ -1009,6 +1113,92 @@
             event.target.value = '';
         }
 
+        function loadCardsFromStorage() {
+            clearStatus();
+            if (!window.localStorage) {
+                showStatus('error', 'Le stockage local est indisponible dans ce navigateur.');
+                return;
+            }
+
+            const storage = window.localStorage;
+            let csvName = 'default';
+            try {
+                csvName = storage.getItem(LAST_CSV_KEY) || 'default';
+            } catch (error) {
+                console.warn('Lecture du dernier CSV impossible', error);
+            }
+
+            const keysToTry = [];
+            if (csvName && csvName !== 'default') {
+                keysToTry.push(`${FLASHCARD_PREFIX}${csvName}`);
+            }
+            keysToTry.push(`${FLASHCARD_PREFIX}default`);
+
+            let raw = null;
+            let resolvedKey = null;
+            for (const key of keysToTry) {
+                try {
+                    raw = storage.getItem(key);
+                } catch (error) {
+                    console.warn('Lecture du stockage local échouée', key, error);
+                    raw = null;
+                }
+                if (raw) {
+                    resolvedKey = key;
+                    break;
+                }
+            }
+
+            if (!raw) {
+                showStatus('warning', 'Aucune carte sauvegardée trouvée. Exportez vos cartes depuis l’application avant de les modifier ici.');
+                return;
+            }
+
+            let cards;
+            try {
+                cards = JSON.parse(raw);
+            } catch (error) {
+                console.error('Impossible d\'analyser les cartes enregistrées', error);
+                showStatus('error', 'Les cartes sauvegardées sont illisibles.');
+                return;
+            }
+
+            if (!Array.isArray(cards) || cards.length === 0) {
+                showStatus('warning', 'Aucune carte sauvegardée trouvée à éditer.');
+                return;
+            }
+
+            cardsBody.innerHTML = '';
+            const questionNames = new Set();
+            const answerNames = new Set();
+
+            cards.forEach((card) => {
+                addRow({
+                    question: card.question || '',
+                    questionImage: card.questionImage || '',
+                    answer: card.answer || '',
+                    answerImage: card.answerImage || '',
+                    box: card.box || '1',
+                    lastReview: card.lastReview || ''
+                });
+                if (card.questionImage) {
+                    questionNames.add(normaliseImageValue(card.questionImage));
+                }
+                if (card.answerImage) {
+                    answerNames.add(normaliseImageValue(card.answerImage));
+                }
+            });
+
+            ensureDatalistOptions('question', questionNames);
+            ensureDatalistOptions('answer', answerNames);
+            updateRowImageInputs('question');
+            updateRowImageInputs('answer');
+
+            const activeCsv = resolvedKey ? resolvedKey.replace(FLASHCARD_PREFIX, '') : csvName;
+            const plural = cards.length > 1 ? 's' : '';
+            showStatus('success', `${cards.length} carte${plural} chargée${plural} depuis « ${activeCsv} ».`);
+        }
+
         configForm.addEventListener('input', (event) => {
             const input = event.target;
             if (input.dataset.config) {
@@ -1070,6 +1260,10 @@
                 showStatus('warning', 'Carte supprimée.');
             }
         });
+
+        if (loadCurrentCardsButton) {
+            loadCurrentCardsButton.addEventListener('click', loadCardsFromStorage);
+        }
 
         document.getElementById('addRow').addEventListener('click', () => {
             addRow();
