@@ -38,7 +38,7 @@ function bootstrap() {
             openAdvancedPage();
         });
 
-        keyboardManager.registerShortcut('ctrl+-', () => {
+        keyboardManager.registerShortcut('ctrl+shift+e', () => {
             advancedButton.focus();
             openAdvancedPage();
         }, {
