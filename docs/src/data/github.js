@@ -105,7 +105,7 @@ export class GitHubManager {
                     window.localStorage.setItem('leitnerCSVList', JSON.stringify(csvList));
                 }
 
-                if (this.csvFiles.length > 0 || branch === '') {
+                if (this.csvFiles.length > 0) {
                     return this.csvFiles;
                 }
             } catch (error) {
