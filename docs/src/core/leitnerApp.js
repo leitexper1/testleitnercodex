@@ -312,7 +312,35 @@ export class LeitnerApp {
             return false;
         }
 
-        const bootstrap = window.__leitnerCSVBootstrap;
+        let bootstrap = window.__leitnerCSVBootstrap;
+
+        if (!bootstrap || !Array.isArray(bootstrap.files) || bootstrap.files.length === 0) {
+            const select = window.document?.getElementById('csv-selector');
+            if (select) {
+                const options = Array.from(select.options || [])
+                    .filter(option => option.value && option.value !== 'default');
+
+                if (options.length > 0) {
+                    bootstrap = {
+                        source: select.dataset.bootstrapSource
+                            || options[0].dataset.source
+                            || 'manifest',
+                        selectedName: select.value && select.value !== 'default'
+                            ? select.value
+                            : null,
+                        files: options.map(option => ({
+                            name: option.value,
+                            download_url: option.dataset.downloadUrl || option.dataset.publicPath || '',
+                            publicPath: option.dataset.publicPath || '',
+                            source: option.dataset.source
+                                || select.dataset.bootstrapSource
+                                || 'manifest'
+                        }))
+                    };
+                }
+            }
+        }
+
         if (!bootstrap || !Array.isArray(bootstrap.files) || bootstrap.files.length === 0) {
             return false;
         }
