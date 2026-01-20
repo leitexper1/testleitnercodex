@@ -1,0 +1,29 @@
+name: Update CSV Manifest
+
+on:
+  push:
+    paths:
+      - 'docs/csv/*.csv'
+      - 'docs/update_csv_list.js'
+
+jobs:
+  update-manifest:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '16'
+          
+      - name: Run update script
+        run: node docs/update_csv_list.js
+        
+      - name: Commit changes
+        uses: stefanzweifel/git-auto-commit-action@v4
+        with:
+          commit_message: "♻️ Auto-update csv-files.json"
+          file_pattern: docs/csv-files.json
