@@ -499,6 +499,11 @@ const CoreApp = {
                 
                 CoreApp.csvData = data;
                 CoreApp.csvData.filename = filename;
+                try {
+                    CoreApp.validateImageStructure(filename);
+                } catch (e) {
+                    console.warn("Validation images ignorée:", e);
+                }
 
                 document.getElementById('reset-deck-btn')?.classList.remove('hidden');
                 CoreApp.renderBoxes();
@@ -507,6 +512,10 @@ const CoreApp = {
 
                 status.textContent = `${CoreApp.csvData.length} cartes chargées.`;
                 status.className = "mt-2 w-full text-sm text-green-600";
+                
+                if (CoreApp.csvData.length === 0) {
+                    alert("Attention : Aucune carte n'a été trouvée dans ce fichier CSV.\nVérifiez le format du fichier.");
+                }
                 
                 StatsUI.renderHistory();
 
@@ -565,16 +574,18 @@ const CoreApp = {
     },
 
     parseCSV: (text) => {
-        const lines = text.split(/\r?\n/).filter(l => l.trim());
+        const lines = text.split(/\r\n|\n|\r/).filter(l => l.trim());
         if (lines.length === 0) return [];
         return lines.slice(1).map((line, index) => {
             const matches = [];
             const regex = /(?:^|,)(?:"([^"]*)"|([^",]*))/g;
             let match;
+            let safety = 0;
             while ((match = regex.exec(line)) !== null) {
                 let val = match[1] !== undefined ? match[1] : match[2];
                 val = val ? val.trim() : '';
                 matches.push(val);
+                if (safety++ > 100) break; // Sécurité : évite une boucle infinie sur une ligne corrompue
             }
             
             // Logique robuste pour gérer les CSV mal formés (virgules dans les réponses)
@@ -740,29 +751,84 @@ const CoreApp = {
 
     buildImageUrl: (filename, type) => {
         if (!filename) return null;
-        if (filename.startsWith('http')) return filename;
+        if (filename.startsWith('http') || filename.startsWith('data:')) return filename;
+        
         const c = APP_STATE.config;
         const folder = type === 'q' ? 'images_questions' : 'images_reponses';
+        
+        let cleanPath = filename.trim().replace(/\\/g, '/').replace(/^(\.\/|\/)/, '');
+        
+        // Si le chemin ne contient pas déjà le dossier parent, on l'ajoute
+        if (!cleanPath.startsWith('images_questions/') && !cleanPath.startsWith('images_reponses/')) {
+            cleanPath = `${folder}/${cleanPath}`;
+        }
+        
+        // Encodage des segments pour l'URL (garde les slashes)
+        const encodedPath = cleanPath.split('/').map(encodeURIComponent).join('/');
+        
         const basePath = c.path.endsWith('/') ? c.path.slice(0, -1) : c.path;
-        return `https://raw.githubusercontent.com/${c.owner}/${c.repo}/${c.branch}/${basePath}/${folder}/${encodeURIComponent(filename)}`;
+        const repoPath = basePath ? `${basePath}/` : '';
+        
+        return `https://raw.githubusercontent.com/${c.owner}/${c.repo}/${c.branch}/${repoPath}${encodedPath}`;
+    },
+
+    validateImageStructure: (filename) => {
+        const baseName = filename.replace(/\.csv$/i, '');
+        const warnings = [];
+
+        CoreApp.csvData.forEach((card, index) => {
+            const check = (path, type) => {
+                if (!path || path.startsWith('http') || path.startsWith('data:')) return;
+                
+                const parts = path.replace(/\\/g, '/').replace(/^(\.\/|\/)/, '').split('/');
+                let subDir = '';
+
+                // Format attendu : images_questions/NOM_FICHIER/image.jpg
+                if ((parts[0] === 'images_questions' || parts[0] === 'images_reponses') && parts.length >= 3) {
+                    subDir = parts[1];
+                } 
+                // Format alternatif : NOM_FICHIER/image.jpg
+                else if (parts.length >= 2 && parts[0] !== 'images_questions' && parts[0] !== 'images_reponses') {
+                    subDir = parts[0];
+                }
+
+                if (subDir && !baseName.startsWith(subDir)) {
+                    warnings.push(`Ligne ${index + 1} (${type}): Le dossier "${subDir}" ne correspond pas au fichier "${baseName}".`);
+                }
+            };
+
+            check(card.qImage, 'Question');
+            check(card.aImage, 'Réponse');
+        });
+
+        if (warnings.length > 0) {
+            console.warn('Validation Structure Images:', warnings);
+            alert(`⚠️ Structure des dossiers d'images incorrecte.\n\nPour le fichier "${filename}", les images doivent être dans un sous-répertoire correspondant au nom du fichier (ex: images_questions/${baseName}/...).\n\n${warnings.length} incohérence(s) détectée(s).`);
+        }
     },
 
     startReview: () => {
         if (!APP_STATE.session) return;
         const s = APP_STATE.session;
-        if (s.currentIndex >= s.totalCards) {
-            SessionManager.updateCurrent(); 
-            alert(`Tour terminé !\nScore : ${s.stats.correct}/${s.totalCards}\n\nVoir l'onglet Statistiques pour les détails.`);
-            CoreApp.closeFlashcard();
-            return;
-        }
-        const cardId = s.cardsQueue[s.currentIndex];
-        const card = CoreApp.csvData.find(c => c.id === cardId);
-        if (card) CoreApp.showCardUI(card);
-        else {
+        
+        // Remplacement de la récursion par une boucle while pour éviter le crash "Maximum call stack size exceeded"
+        // et les boucles infinies si les cartes ne sont pas trouvées.
+        while (s.currentIndex < s.totalCards) {
+            const cardId = s.cardsQueue[s.currentIndex];
+            const card = CoreApp.csvData.find(c => c.id === cardId);
+            
+            if (card) {
+                CoreApp.showCardUI(card);
+                return;
+            }
+            // Carte introuvable (supprimée ou ID obsolète), on passe à la suivante
             s.currentIndex++;
-            CoreApp.startReview();
         }
+        
+        // Fin de session
+        SessionManager.updateCurrent(); 
+        alert(`Tour terminé !\nScore : ${s.stats.correct}/${s.totalCards}\n\nVoir l'onglet Statistiques pour les détails.`);
+        CoreApp.closeFlashcard();
     },
 
     showCardUI: (card) => {

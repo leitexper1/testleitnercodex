@@ -14,48 +14,60 @@
           return `${url}${separator}t=${Date.now()}`;
       }
 
-      async function fetchCsvFilesFromGitHub() {
-        const owner = 'leitexper1';
-        const repo = 'testleitnercodex';
-        const branch = 'main';
-        const folderPath = 'docs';
-        const folderPrefix = folderPath.endsWith('/') ? folderPath : `${folderPath}/`;
-    
-        // ASTUCE ANTI-CACHE : Le timestamp dans l'URL suffit (pas besoin de headers)
-        const treeUrl = `https://api.github.com/repos/${owner}/${repo}/git/trees/${branch}?recursive=1&t=${Date.now()}`;
+      // REMPLACEMENT : Fonction locale utilisant le fichier manifeste généré
+      async function fetchCsvFilesLocal() {
+        const files = [];
+        const seen = new Set();
         
-        console.log("Connexion GitHub :", treeUrl);
+        // 1. Essayer le fichier manifeste (généré par GitHub Action)
+        try {
+            const response = await fetch(getNoCacheUrl('csv-files.json'));
+            if (response.ok) {
+                const jsonFiles = await response.json();
+                jsonFiles.forEach(f => {
+                    files.push({ name: f, download_url: f, source: 'manifest' });
+                    seen.add(f);
+                });
+            }
+        } catch (e) { console.log("Pas de manifeste trouvé."); }
 
-        // CORRECTION CORS : On retire les headers "Cache-Control" qui bloquent la requête
-        const response = await fetch(treeUrl);
-    
-        if (!response.ok) {
-          throw new Error(`Erreur API GitHub : ${response.status}`);
+        // 2. SCAN AUTOMATIQUE DU DOSSIER (Pour le local)
+        // Permet de détecter les nouveaux fichiers sans lancer de script manuel
+        // Note : On scanne la racine './' ET un dossier 'csv/' car index.html peut masquer le listing racine.
+        const pathsToScan = ['./', 'csv/'];
+
+        for (const basePath of pathsToScan) {
+            try {
+                const response = await fetch(basePath);
+                if (response.ok) {
+                    const text = await response.text();
+                    const regex = /href=["']?([^"'>?]+\.csv)["'>]/gi;
+                    let match;
+                    while ((match = regex.exec(text)) !== null) {
+                        const link = decodeURIComponent(match[1]);
+                        const name = link.split('/').pop(); // Garde uniquement le nom du fichier
+                        
+                        if (!seen.has(name)) {
+                            // Si on scanne le dossier 'csv/', on ajoute le préfixe au chemin de téléchargement
+                            let downloadUrl = link;
+                            if (basePath !== './' && !link.includes('/')) {
+                                downloadUrl = basePath + link;
+                            }
+                            
+                            files.push({ name: name, download_url: downloadUrl, source: 'auto-detect' });
+                            seen.add(name);
+                            console.log(`Fichier détecté (${basePath}) : ${name}`);
+                        }
+                    }
+                }
+            } catch (e) { console.log(`Scan impossible pour ${basePath}`); }
         }
-    
-        const payload = await response.json();
-        if (!payload?.tree) {
-          throw new Error('Réponse inattendue de l’API GitHub.');
-        }
-    
-        return payload.tree
-          .filter(item => item.type === 'blob' && item.path.startsWith(folderPrefix) && item.path.endsWith('.csv'))
-          .map(item => {
-            const relativePath = item.path.substring(folderPrefix.length);
-            const publicPath = item.path.startsWith('docs/') ? item.path.substring(5) : item.path;
-            const encodedPath = item.path.split('/').map(encodeURIComponent).join('/');
-            
-            // Lien brut avec anti-cache également
-            const downloadUrl = `https://raw.githubusercontent.com/${owner}/${repo}/${branch}/${encodedPath}`;
-    
-            return {
-              name: relativePath,
-              publicPath,
-              download_url: downloadUrl,
-              source: 'github'
-            };
-          })
-          .sort((a, b) => a.name.localeCompare(b.name, 'fr'));
+        
+        if (files.length === 0) throw new Error("Aucun fichier CSV trouvé.\n\nConseil : Créez un dossier 'csv' dans 'docs' et placez-y vos fichiers pour une détection automatique garantie.");
+        
+        // Dédoublonnage et tri
+        const unique = [...new Map(files.map(item => [item.name, item])).values()];
+        return unique.sort((a, b) => a.name.localeCompare(b.name, 'fr'));
       }
     
       // --- LOGIQUE DE REMPLISSAGE DU SELECT ---
@@ -92,24 +104,24 @@
         const savedText = select.options[select.selectedIndex]?.text;
         
         // On ne change le texte que si c'est un chargement manuel (bouton)
-        if(!preserveSelection) select.innerHTML = '<option>Actualisation GitHub...</option>';
+        if(!preserveSelection) select.innerHTML = '<option>Chargement de la liste...</option>';
         
         if(status) {
             status.classList.remove('hidden');
-            status.textContent = "Connexion à GitHub...";
+            status.textContent = "Lecture du catalogue...";
             status.className = "mt-2 w-full text-sm text-blue-600";
         }
     
         try {
-          const githubFiles = await fetchCsvFilesFromGitHub();
+          const files = await fetchCsvFilesLocal();
           
           const currentVal = window.__leitnerSelectedName;
           const preferredName = preserveSelection ? (currentVal || null) : null;
     
-          populateCsvSelect(select, githubFiles, { preferredName });
+          populateCsvSelect(select, files, { preferredName });
           
           if(status) {
-              status.textContent = `✔ ${githubFiles.length} fichiers synchronisés.`;
+              status.textContent = `✔ ${files.length} fichiers disponibles.`;
               status.className = "mt-2 w-full text-sm text-green-600";
               setTimeout(() => status.classList.add('hidden'), 4000);
           }
@@ -117,11 +129,9 @@
         } catch (err) {
           console.error('Erreur chargement CSV :', err);
           
-          // En cas d'erreur, on remet une option par défaut
-          if(!preserveSelection) select.innerHTML = '<option value="">Erreur de connexion</option>';
-          
+          if(!preserveSelection) select.innerHTML = '<option value="">Erreur de chargement</option>';
           if(status) {
-              status.textContent = "Erreur : Impossible de joindre GitHub.";
+              status.textContent = "Erreur : " + err.message;
               status.className = "mt-2 w-full text-sm text-red-600";
           }
         } finally {
@@ -191,7 +201,7 @@
             <section id="tab-review" class="tab-panel space-y-6" role="tabpanel" aria-labelledby="tab-review-trigger" data-tab-panel="review">
                 <div class="bg-white rounded-lg shadow-md p-5">
                     <div class="flex flex-wrap justify-between items-center mb-4">
-                        <h2 class="text-xl font-bold mb-4 md:mb-0 w-full">Choisir un sujet à mémoriser.</h2>
+                        <h2 class="text-xl font-bold mb-4 md:mb-0 w-full">Choisir un sujet  à mémoriser.</h2>
                         <p id="csv-load-status" class="mt-2 w-full text-sm text-green-600 hidden" role="status" aria-live="polite"></p>
                     </div>
 

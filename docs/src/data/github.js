@@ -327,7 +327,7 @@ export class GitHubManager {
         if (imagePath.startsWith('data:')) return imagePath;
         
         // Construire l'URL GitHub pour l'image
-        const normalised = imagePath.replace(/^\.\//, '').replace(/^\//, '');
+        const normalised = imagePath.replace(/\\/g, '/').replace(/^\.\//, '').replace(/^\//, '');
 
         if (this.localBaseUrl) {
             let relativePath = normalised;
