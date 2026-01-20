@@ -3,7 +3,7 @@ name: Update CSV Manifest
 on:
   push:
     paths:
-      - 'docs/*.csv'
+      - 'docs/csv/*.csv'
 
 jobs:
   update-manifest:
